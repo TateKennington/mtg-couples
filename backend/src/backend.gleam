@@ -1,6 +1,9 @@
+import gleam/bool
 import gleam/erlang/process
+import gleam/float
 import gleam/http
 import gleam/http/request
+import gleam/http/response
 import gleam/httpc
 import gleam/result
 import gleam/string
@@ -16,10 +19,15 @@ type ListingErr {
   HTTPErr(httpc.HttpError)
 }
 
-fn get_listings(card, page) {
+fn get_listings(card, page, retries) {
+  use <- bool.guard(
+    retries <= 0,
+    Ok(response.new(200) |> response.set_body("[]")),
+  )
+
   let request_url =
     string.concat([
-      "https://api.mtgsingles.co.nz/MtgSingle?pageSize=20&query=",
+      "https://api.mtgsingles.co.nz/MtgSingle?tcgType=1&store=6&store=7&store=11&store=32&store=3&store=27&store=28&store=13&store=4&store=18&store=2&store=19&store=16&store=1&store=31&store=42&isExactMatch=false&condition=NM%20/%20SP&condition=SP%20/%20LP&Country=1&pageSize=20&query=",
       card,
       "&page=",
       page,
@@ -38,17 +46,20 @@ fn get_listings(card, page) {
   let resp_result = httpc.send(req) |> result.map_error(HTTPErr)
   use resp <- result.try(resp_result)
 
-  case resp.body == "API calls quota exceeded! maximum admitted 5 per 5s." {
+  case
+    resp.body == "API calls quota exceeded! maximum admitted 5 per 5s."
+    || resp.body == "error code: 1015"
+  {
     False -> Ok(resp)
     True -> {
-      process.sleep(5000)
-      get_listings(card, page)
+      process.sleep(2000 + float.truncate(float.random() *. 500.0))
+      get_listings(card, page, retries - 1)
     }
   }
 }
 
 fn listings(card, page) {
-  case get_listings(card, page) {
+  case get_listings(card, page, 6) {
     Ok(resp) ->
       wisp.html_response(resp.body, 200)
       |> wisp.set_header("content-type", "application/json")

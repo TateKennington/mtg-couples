@@ -130,7 +130,7 @@ fn submit_decklist(model) {
     DecklistInput(decklist) -> {
       let decklist = parse_decklist(decklist)
       let cards = list.map(decklist, fn(x) { x.0 })
-      let #(inflight, pending_load) = list.split(cards, 5)
+      let #(inflight, pending_load) = list.split(cards, 1)
 
       let model = Loading(decklist:, pending_load:, results: dict.new())
 
@@ -315,19 +315,19 @@ fn listing_view(listing: Listing, events) {
     ],
     [
       html.p([attribute.class("w-fit")], [element.text(listing.store)]),
-      html.a([attribute.href(listing.url), attribute.target("blank")], [
-        html.img([
-          attribute.src(listing.image_url),
-          attribute.class("w-[200px]"),
-          attribute.class("h-[280px]"),
-          attribute.class("object-cover"),
-          attribute.class("object-center"),
-          attribute.class("rounded-lg"),
-          attribute.class("max-w-none"),
-          attribute.loading("lazy"),
-          ..img_classes
-        ]),
+      // html.a([attribute.href(listing.url), attribute.target("blank")], [
+      html.img([
+        attribute.src(listing.image_url),
+        attribute.class("w-[200px]"),
+        attribute.class("h-[280px]"),
+        attribute.class("object-cover"),
+        attribute.class("object-center"),
+        attribute.class("rounded-lg"),
+        attribute.class("max-w-none"),
+        attribute.loading("lazy"),
+        ..img_classes
       ]),
+      // ]),
       html.div(
         [
           attribute.class("flex"),
@@ -352,8 +352,8 @@ fn listings_view(listings, get_events) {
       attribute.style("display", "flex"),
       attribute.style("flex-direction", "row"),
       attribute.style("gap", "20px"),
-      attribute.class("max-w-full"),
-      attribute.class("flex-wrap"),
+      attribute.class("max-w-9/10"),
+      attribute.class("overflow-x-scroll"),
     ],
     list.index_map(listings, fn(listing, index) {
       listing_view(listing, get_events(index))
@@ -361,13 +361,56 @@ fn listings_view(listings, get_events) {
   )
 }
 
-fn loading_view(results: dict.Dict(String, List(Listing))) {
+fn order_view(listings, get_events) {
+  html.div(
+    [
+      attribute.style("display", "flex"),
+      attribute.style("flex-direction", "row"),
+      attribute.style("gap", "20px"),
+      attribute.class("max-w-9/10"),
+      attribute.class("flex-wrap"),
+      attribute.class("m-8"),
+    ],
+    list.index_map(listings, fn(listing, index) {
+      listing_view(listing, get_events(index))
+    }),
+  )
+}
+
+fn loading_view(
+  decklist: List(#(String, a)),
+  results: dict.Dict(String, List(Listing)),
+) {
   let children =
-    dict.fold(results, [], fn(acc, card, listings) {
-      list.append(acc, [
-        html.h3([], [element.text(card)]),
-        listings_view(listings, fn(_index) { [] }),
-      ])
+    list.fold(decklist, [], fn(acc, card) {
+      let card = card.0
+      case dict.get(results, card) {
+        Error(_) ->
+          list.append(acc, [
+            html.div(
+              [
+                attribute.class("m-8"),
+                attribute.class("h-[280px]"),
+              ],
+              [
+                html.h3([], [element.text(card)]),
+                html.p([], [element.text("Loading")]),
+              ],
+            ),
+          ])
+        Ok(listings) ->
+          list.append(acc, [
+            html.div(
+              [
+                attribute.class("m-8"),
+              ],
+              [
+                html.h3([], [element.text(card)]),
+                listings_view(listings, fn(_index) { [] }),
+              ],
+            ),
+          ])
+      }
     })
   html.div([], children)
 }
@@ -456,8 +499,8 @@ pub fn find_optimal(
   let stores =
     list.filter(all_stores, fn(store) {
       let assert Ok(listings) = dict.get(store_listings, store)
-      !list.contains(must_include, store)
-      && !list.any(all_stores, fn(other_store) {
+      // !list.contains(must_include, store)&&
+      !list.any(all_stores, fn(other_store) {
         let assert Ok(other_listings) = dict.get(store_listings, other_store)
 
         list.all(dict.to_list(listings), fn(entry) {
@@ -515,20 +558,44 @@ fn review_view(decklist, results, constraints) {
   let assert Ok(#(optimal_price, optimal_listings, _)) =
     find_optimal(decklist, results, constraints)
   let results_views =
-    dict.fold(results, [], fn(acc, card, listings) {
-      list.append(acc, [
-        html.h3([], [element.text(card)]),
-        listings_view(listings, fn(index) {
-          [event.on_click(UserUpdatedConstraints(card:, index:))]
-        }),
-      ])
+    list.fold(decklist, [], fn(acc, card) {
+      let card = card.0
+      case dict.get(results, card) {
+        Error(_) ->
+          list.append(acc, [
+            html.div(
+              [
+                attribute.class("m-8"),
+                attribute.class("h-[280px]"),
+              ],
+              [
+                html.h3([], [element.text(card)]),
+                html.p([], [element.text("None found")]),
+              ],
+            ),
+          ])
+        Ok(listings) ->
+          list.append(acc, [
+            html.div(
+              [
+                attribute.class("m-8"),
+              ],
+              [
+                html.h3([], [element.text(card)]),
+                listings_view(listings, fn(index) {
+                  [event.on_click(UserUpdatedConstraints(card:, index:))]
+                }),
+              ],
+            ),
+          ])
+      }
     })
   html.div([], [
     html.h3([], [
       element.text("Best Order - "),
       element.text(float.to_string(optimal_price)),
     ]),
-    listings_view(optimal_listings, fn(_index) { [] }),
+    order_view(optimal_listings, fn(_index) { [] }),
     ..results_views
   ])
 }
@@ -536,7 +603,7 @@ fn review_view(decklist, results, constraints) {
 fn view(model) -> element.Element(Msg) {
   case model {
     DecklistInput(decklist) -> decklist_input_view(decklist)
-    Loading(results:, ..) -> loading_view(results)
+    Loading(decklist:, results:, ..) -> loading_view(decklist, results)
     Review(decklist:, results:, constraints:) ->
       review_view(decklist, results, constraints)
   }

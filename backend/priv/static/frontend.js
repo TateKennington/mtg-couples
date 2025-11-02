@@ -1,3 +1,12 @@
+// build/dev/javascript/gleam_stdlib/gleam/bool.mjs
+function guard(requirement, consequence, alternative) {
+  if (requirement) {
+    return consequence;
+  } else {
+    return alternative();
+  }
+}
+
 // build/dev/javascript/prelude.mjs
 class CustomType {
   withFields(fields) {
@@ -284,6 +293,32 @@ function makeError(variant, file, module, line, fn, message, extra) {
     error[k] = extra[k];
   return error;
 }
+// build/dev/javascript/gleam_stdlib/gleam/option.mjs
+class Some extends CustomType {
+  constructor($0) {
+    super();
+    this[0] = $0;
+  }
+}
+class None extends CustomType {
+}
+function to_result(option, e) {
+  if (option instanceof Some) {
+    let a = option[0];
+    return new Ok(a);
+  } else {
+    return new Error(e);
+  }
+}
+function unwrap(option, default$) {
+  if (option instanceof Some) {
+    let x = option[0];
+    return x;
+  } else {
+    return default$;
+  }
+}
+
 // build/dev/javascript/gleam_stdlib/dict.mjs
 var referenceMap = /* @__PURE__ */ new WeakMap;
 var tempDataView = /* @__PURE__ */ new DataView(/* @__PURE__ */ new ArrayBuffer(8));
@@ -923,41 +958,6 @@ class Dict {
   }
 }
 var unequalDictSymbol = /* @__PURE__ */ Symbol();
-
-// build/dev/javascript/gleam_stdlib/gleam/bool.mjs
-function guard(requirement, consequence, alternative) {
-  if (requirement) {
-    return consequence;
-  } else {
-    return alternative();
-  }
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/option.mjs
-class Some extends CustomType {
-  constructor($0) {
-    super();
-    this[0] = $0;
-  }
-}
-class None extends CustomType {
-}
-function to_result(option, e) {
-  if (option instanceof Some) {
-    let a = option[0];
-    return new Ok(a);
-  } else {
-    return new Error(e);
-  }
-}
-function unwrap(option, default$) {
-  if (option instanceof Some) {
-    let x = option[0];
-    return x;
-  } else {
-    return default$;
-  }
-}
 
 // build/dev/javascript/gleam_stdlib/gleam/order.mjs
 class Lt extends CustomType {
@@ -2489,26 +2489,6 @@ function upsert(dict2, key, fun) {
     return insert(dict2, key, fun(new None));
   }
 }
-function fold_loop(loop$list, loop$initial, loop$fun) {
-  while (true) {
-    let list3 = loop$list;
-    let initial = loop$initial;
-    let fun = loop$fun;
-    if (list3 instanceof Empty) {
-      return initial;
-    } else {
-      let rest = list3.tail;
-      let k = list3.head[0];
-      let v = list3.head[1];
-      loop$list = rest;
-      loop$initial = fun(initial, k, v);
-      loop$fun = fun;
-    }
-  }
-}
-function fold2(dict2, initial, fun) {
-  return fold_loop(map_to_list(dict2), initial, fun);
-}
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
 function is_ok(result) {
@@ -3467,12 +3447,6 @@ function style(property3, value) {
     return attribute2("style", property3 + ":" + value + ";");
   }
 }
-function href(url) {
-  return attribute2("href", url);
-}
-function target(value) {
-  return attribute2("target", value);
-}
 function src(url) {
   return attribute2("src", url);
 }
@@ -4037,9 +4011,6 @@ function div(attrs, children) {
 }
 function p(attrs, children) {
   return element2("p", attrs, children);
-}
-function a(attrs, children) {
-  return element2("a", attrs, children);
 }
 function img(attrs) {
   return element2("img", attrs, empty_list);
@@ -5697,8 +5668,8 @@ class Runtime {
     }
   }
   emit(event3, data) {
-    const target2 = this.root.host ?? this.root;
-    target2.dispatchEvent(new CustomEvent(event3, {
+    const target = this.root.host ?? this.root;
+    target.dispatchEvent(new CustomEvent(event3, {
       detail: data,
       bubbles: true,
       composed: true
@@ -5798,13 +5769,13 @@ function makeEffect(synchronous) {
     before_paint: empty_list
   };
 }
-function listAppend(a2, b) {
-  if (a2 instanceof Empty) {
+function listAppend(a, b) {
+  if (a instanceof Empty) {
     return b;
   } else if (b instanceof Empty) {
-    return a2;
+    return a;
   } else {
-    return append(a2, b);
+    return append(a, b);
   }
 }
 var copiedStyleSheets = new WeakMap;
@@ -6280,17 +6251,17 @@ function map_promise(promise, fn) {
 // build/dev/javascript/gleam_javascript/gleam/javascript/promise.mjs
 function tap(promise, callback) {
   let _pipe = promise;
-  return map_promise(_pipe, (a2) => {
-    callback(a2);
-    return a2;
+  return map_promise(_pipe, (a) => {
+    callback(a);
+    return a;
   });
 }
 function try_await(promise, callback) {
   let _pipe = promise;
   return then_await(_pipe, (result) => {
     if (result instanceof Ok) {
-      let a2 = result[0];
-      return callback(a2);
+      let a = result[0];
+      return callback(a);
     } else {
       let e = result[0];
       return resolve(new Error(e));
@@ -6615,12 +6586,10 @@ function get_listings(card, page) {
     });
   });
   let expect = expect_json(list2(decoder), (res) => {
-    echo(res, undefined, "src/frontend.gleam", 110);
     let res$1 = unwrap2(res, toList([]));
     return new ApiReturnedListings(res$1, card, page + 1);
   });
   let url = concat2(toList(["/listings/", percent_encode(card), "/", to_string(page)]));
-  echo(url, undefined, "src/frontend.gleam", 124);
   return get2(url, expect);
 }
 function update_decklist(model, decklist) {
@@ -6628,7 +6597,7 @@ function update_decklist(model, decklist) {
   if (model instanceof DecklistInput) {
     _block = new DecklistInput(decklist);
   } else {
-    throw makeError("panic", FILEPATH, "frontend", 143, "update_decklist", "`panic` expression evaluated.", {});
+    throw makeError("panic", FILEPATH, "frontend", 117, "update_decklist", "`panic` expression evaluated.", {});
   }
   let model$1 = _block;
   return [model$1, none()];
@@ -6647,7 +6616,7 @@ function submit_decklist(model) {
     let cards = map(decklist$1, (x) => {
       return x[0];
     });
-    let $ = split(cards, 5);
+    let $ = split(cards, 1);
     let inflight;
     let pending_load;
     inflight = $[0];
@@ -6666,7 +6635,7 @@ function submit_decklist(model) {
     let effect = _block;
     return [model$1, effect];
   } else {
-    throw makeError("panic", FILEPATH, "frontend", 171, "submit_decklist", "`panic` expression evaluated.", {});
+    throw makeError("panic", FILEPATH, "frontend", 145, "submit_decklist", "`panic` expression evaluated.", {});
   }
 }
 function api_returned_listings(loop$model, loop$listings, loop$card, loop$next_page) {
@@ -6677,7 +6646,7 @@ function api_returned_listings(loop$model, loop$listings, loop$card, loop$next_p
     let next_page = loop$next_page;
     if (listings instanceof Empty) {
       if (model instanceof DecklistInput) {
-        throw makeError("panic", FILEPATH, "frontend", 228, "api_returned_listings", "`panic` expression evaluated.", {});
+        throw makeError("panic", FILEPATH, "frontend", 202, "api_returned_listings", "`panic` expression evaluated.", {});
       } else if (model instanceof Loading) {
         let $ = model.pending_load;
         if ($ instanceof Empty) {
@@ -6700,10 +6669,10 @@ function api_returned_listings(loop$model, loop$listings, loop$card, loop$next_p
           }
         }
       } else {
-        throw makeError("panic", FILEPATH, "frontend", 228, "api_returned_listings", "`panic` expression evaluated.", {});
+        throw makeError("panic", FILEPATH, "frontend", 202, "api_returned_listings", "`panic` expression evaluated.", {});
       }
     } else if (model instanceof DecklistInput) {
-      throw makeError("panic", FILEPATH, "frontend", 228, "api_returned_listings", "`panic` expression evaluated.", {});
+      throw makeError("panic", FILEPATH, "frontend", 202, "api_returned_listings", "`panic` expression evaluated.", {});
     } else if (model instanceof Loading) {
       let listings$1 = listings;
       let results = model.results;
@@ -6747,7 +6716,7 @@ function api_returned_listings(loop$model, loop$listings, loop$card, loop$next_p
         ];
       }
     } else {
-      throw makeError("panic", FILEPATH, "frontend", 228, "api_returned_listings", "`panic` expression evaluated.", {});
+      throw makeError("panic", FILEPATH, "frontend", 202, "api_returned_listings", "`panic` expression evaluated.", {});
     }
   }
 }
@@ -6763,7 +6732,7 @@ function update_constraints(model, card, index5) {
       }
     }));
   } else {
-    throw makeError("panic", FILEPATH, "frontend", 244, "update_constraints", "`panic` expression evaluated.", {});
+    throw makeError("panic", FILEPATH, "frontend", 218, "update_constraints", "`panic` expression evaluated.", {});
   }
   let model$1 = _block;
   return [model$1, none()];
@@ -6844,9 +6813,7 @@ function listing_view(listing, events) {
   let img_classes = _block;
   return div(prepend(class$("flex"), prepend(class$("flex-col"), prepend(class$("items-center"), events))), toList([
     p(toList([class$("w-fit")]), toList([text2(listing.store)])),
-    a(toList([href(listing.url), target("blank")]), toList([
-      img(prepend(src(listing.image_url), prepend(class$("w-[200px]"), prepend(class$("h-[280px]"), prepend(class$("object-cover"), prepend(class$("object-center"), prepend(class$("rounded-lg"), prepend(class$("max-w-none"), prepend(loading("lazy"), img_classes)))))))))
-    ])),
+    img(prepend(src(listing.image_url), prepend(class$("w-[200px]"), prepend(class$("h-[280px]"), prepend(class$("object-cover"), prepend(class$("object-center"), prepend(class$("rounded-lg"), prepend(class$("max-w-none"), prepend(loading("lazy"), img_classes))))))))),
     div(toList([
       class$("flex"),
       class$("w-full"),
@@ -6865,20 +6832,46 @@ function listings_view(listings, get_events) {
     style("display", "flex"),
     style("flex-direction", "row"),
     style("gap", "20px"),
-    class$("max-w-full"),
-    class$("flex-wrap")
+    class$("max-w-9/10"),
+    class$("overflow-x-scroll")
   ]), index_map(listings, (listing, index5) => {
     return listing_view(listing, get_events(index5));
   }));
 }
-function loading_view(results) {
-  let children = fold2(results, toList([]), (acc, card, listings) => {
-    return append(acc, toList([
-      h3(toList([]), toList([text2(card)])),
-      listings_view(listings, (_) => {
-        return toList([]);
-      })
-    ]));
+function order_view(listings, get_events) {
+  return div(toList([
+    style("display", "flex"),
+    style("flex-direction", "row"),
+    style("gap", "20px"),
+    class$("max-w-9/10"),
+    class$("flex-wrap"),
+    class$("m-8")
+  ]), index_map(listings, (listing, index5) => {
+    return listing_view(listing, get_events(index5));
+  }));
+}
+function loading_view(decklist, results) {
+  let children = fold(decklist, toList([]), (acc, card) => {
+    let card$1 = card[0];
+    let $ = map_get(results, card$1);
+    if ($ instanceof Ok) {
+      let listings = $[0];
+      return append(acc, toList([
+        div(toList([class$("m-8")]), toList([
+          h3(toList([]), toList([text2(card$1)])),
+          listings_view(listings, (_) => {
+            return toList([]);
+          })
+        ]))
+      ]));
+    } else {
+      return append(acc, toList([
+        div(toList([class$("m-8"), class$("h-[280px]")]), toList([
+          h3(toList([]), toList([text2(card$1)])),
+          p(toList([]), toList([text2("Loading")]))
+        ]))
+      ]));
+    }
   });
   return div(toList([]), children);
 }
@@ -6989,26 +6982,26 @@ function find_optimal(decklist, results, constraints) {
     if ($12 instanceof Ok) {
       listings = $12[0];
     } else {
-      throw makeError("let_assert", FILEPATH, "frontend", 484, "find_optimal", "Pattern match failed, no pattern matched the value.", {
+      throw makeError("let_assert", FILEPATH, "frontend", 501, "find_optimal", "Pattern match failed, no pattern matched the value.", {
         value: $12,
-        start: 13386,
-        end: 13443,
-        pattern_start: 13397,
-        pattern_end: 13409
+        start: 13575,
+        end: 13632,
+        pattern_start: 13586,
+        pattern_end: 13598
       });
     }
-    return !contains(must_include, store) && !any(all_stores, (other_store) => {
+    return !any(all_stores, (other_store) => {
       let $2 = map_get(store_listings, other_store);
       let other_listings;
       if ($2 instanceof Ok) {
         other_listings = $2[0];
       } else {
-        throw makeError("let_assert", FILEPATH, "frontend", 487, "find_optimal", "Pattern match failed, no pattern matched the value.", {
+        throw makeError("let_assert", FILEPATH, "frontend", 504, "find_optimal", "Pattern match failed, no pattern matched the value.", {
           value: $2,
-          start: 13543,
-          end: 13612,
-          pattern_start: 13554,
-          pattern_end: 13572
+          start: 13734,
+          end: 13803,
+          pattern_start: 13745,
+          pattern_end: 13763
         });
       }
       return all(map_to_list(listings), (entry) => {
@@ -7031,12 +7024,12 @@ function find_optimal(decklist, results, constraints) {
   if ($1 instanceof Ok) {
     max3 = $1[0];
   } else {
-    throw makeError("let_assert", FILEPATH, "frontend", 500, "find_optimal", "Pattern match failed, no pattern matched the value.", {
+    throw makeError("let_assert", FILEPATH, "frontend", 517, "find_optimal", "Pattern match failed, no pattern matched the value.", {
       value: $1,
-      start: 13940,
-      end: 14008,
-      pattern_start: 13951,
-      pattern_end: 13958
+      start: 14131,
+      end: 14199,
+      pattern_start: 14142,
+      pattern_end: 14149
     });
   }
   let _pipe$4 = range(1, truncate(max3) - 1);
@@ -7060,8 +7053,8 @@ function find_optimal(decklist, results, constraints) {
       let _pipe$7 = filter(listings2, (listing) => {
         return contains(stores$1, listing.store);
       });
-      return max(_pipe$7, (a2, b) => {
-        return compare(b.price, a2.price);
+      return max(_pipe$7, (a, b) => {
+        return compare(b.price, a.price);
       });
     });
     return [
@@ -7072,10 +7065,10 @@ function find_optimal(decklist, results, constraints) {
       20 * identity(length(stores$1) + length(must_include))
     ];
   });
-  return max(_pipe$6, (a2, b) => {
-    let $2 = compare2(length(a2[1]), length(b[1]));
+  return max(_pipe$6, (a, b) => {
+    let $2 = compare2(length(a[1]), length(b[1]));
     if ($2 instanceof Eq) {
-      return compare(b[0] + b[2], a2[0] + a2[2]);
+      return compare(b[0] + b[2], a[0] + a[2]);
     } else {
       return $2;
     }
@@ -7089,28 +7082,42 @@ function review_view(decklist, results, constraints) {
     optimal_price = $[0][0];
     optimal_listings = $[0][1];
   } else {
-    throw makeError("let_assert", FILEPATH, "frontend", 541, "review_view", "Pattern match failed, no pattern matched the value.", {
+    throw makeError("let_assert", FILEPATH, "frontend", 558, "review_view", "Pattern match failed, no pattern matched the value.", {
       value: $,
-      start: 15238,
-      end: 15341,
-      pattern_start: 15249,
-      pattern_end: 15290
+      start: 15429,
+      end: 15532,
+      pattern_start: 15440,
+      pattern_end: 15481
     });
   }
-  let results_views = fold2(results, toList([]), (acc, card, listings) => {
-    return append(acc, toList([
-      h3(toList([]), toList([text2(card)])),
-      listings_view(listings, (index5) => {
-        return toList([
-          on_click(new UserUpdatedConstraints(card, index5))
-        ]);
-      })
-    ]));
+  let results_views = fold(decklist, toList([]), (acc, card) => {
+    let card$1 = card[0];
+    let $1 = map_get(results, card$1);
+    if ($1 instanceof Ok) {
+      let listings = $1[0];
+      return append(acc, toList([
+        div(toList([class$("m-8")]), toList([
+          h3(toList([]), toList([text2(card$1)])),
+          listings_view(listings, (index5) => {
+            return toList([
+              on_click(new UserUpdatedConstraints(card$1, index5))
+            ]);
+          })
+        ]))
+      ]));
+    } else {
+      return append(acc, toList([
+        div(toList([class$("m-8"), class$("h-[280px]")]), toList([
+          h3(toList([]), toList([text2(card$1)])),
+          p(toList([]), toList([text2("None found")]))
+        ]))
+      ]));
+    }
   });
   return div(toList([]), prepend(h3(toList([]), toList([
     text2("Best Order - "),
     text2(float_to_string(optimal_price))
-  ])), prepend(listings_view(optimal_listings, (_) => {
+  ])), prepend(order_view(optimal_listings, (_) => {
     return toList([]);
   }), results_views)));
 }
@@ -7120,7 +7127,8 @@ function view(model) {
     return decklist_input_view(decklist);
   } else if (model instanceof Loading) {
     let results = model.results;
-    return loading_view(results);
+    let decklist = model.decklist;
+    return loading_view(decklist, results);
   } else {
     let results = model.results;
     let decklist = model.decklist;
@@ -7132,233 +7140,15 @@ function main() {
   let app = application(init, update2, view);
   let $ = start3(app, "#app", undefined);
   if (!($ instanceof Ok)) {
-    throw makeError("let_assert", FILEPATH, "frontend", 573, "main", "Pattern match failed, no pattern matched the value.", {
+    throw makeError("let_assert", FILEPATH, "frontend", 614, "main", "Pattern match failed, no pattern matched the value.", {
       value: $,
-      start: 16182,
-      end: 16231,
-      pattern_start: 16193,
-      pattern_end: 16198
+      start: 17018,
+      end: 17067,
+      pattern_start: 17029,
+      pattern_end: 17034
     });
   }
   return;
-}
-function echo(value, message2, file, line) {
-  const grey = "\x1B[90m";
-  const reset_color = "\x1B[39m";
-  const file_line = `${file}:${line}`;
-  const inspector = new Echo$Inspector;
-  const string_value = inspector.inspect(value);
-  const string_message = message2 === undefined ? "" : " " + message2;
-  if (globalThis.process?.stderr?.write) {
-    const string5 = `${grey}${file_line}${reset_color}${string_message}
-${string_value}
-`;
-    globalThis.process.stderr.write(string5);
-  } else if (globalThis.Deno) {
-    const string5 = `${grey}${file_line}${reset_color}${string_message}
-${string_value}
-`;
-    globalThis.Deno.stderr.writeSync(new TextEncoder().encode(string5));
-  } else {
-    const string5 = `${file_line}${string_message}
-${string_value}`;
-    globalThis.console.log(string5);
-  }
-  return value;
-}
-
-class Echo$Inspector {
-  #references = new globalThis.Set;
-  #isDict(value) {
-    try {
-      return value instanceof Dict;
-    } catch {
-      return false;
-    }
-  }
-  #float(float2) {
-    const string5 = float2.toString().replace("+", "");
-    if (string5.indexOf(".") >= 0) {
-      return string5;
-    } else {
-      const index5 = string5.indexOf("e");
-      if (index5 >= 0) {
-        return string5.slice(0, index5) + ".0" + string5.slice(index5);
-      } else {
-        return string5 + ".0";
-      }
-    }
-  }
-  inspect(v) {
-    const t = typeof v;
-    if (v === true)
-      return "True";
-    if (v === false)
-      return "False";
-    if (v === null)
-      return "//js(null)";
-    if (v === undefined)
-      return "Nil";
-    if (t === "string")
-      return this.#string(v);
-    if (t === "bigint" || globalThis.Number.isInteger(v))
-      return v.toString();
-    if (t === "number")
-      return this.#float(v);
-    if (v instanceof UtfCodepoint)
-      return this.#utfCodepoint(v);
-    if (v instanceof BitArray)
-      return this.#bit_array(v);
-    if (v instanceof globalThis.RegExp)
-      return `//js(${v})`;
-    if (v instanceof globalThis.Date)
-      return `//js(Date("${v.toISOString()}"))`;
-    if (v instanceof globalThis.Error)
-      return `//js(${v.toString()})`;
-    if (v instanceof globalThis.Function) {
-      const args = [];
-      for (const i of globalThis.Array(v.length).keys())
-        args.push(globalThis.String.fromCharCode(i + 97));
-      return `//fn(${args.join(", ")}) { ... }`;
-    }
-    if (this.#references.size === this.#references.add(v).size) {
-      return "//js(circular reference)";
-    }
-    let printed;
-    if (globalThis.Array.isArray(v)) {
-      printed = `#(${v.map((v2) => this.inspect(v2)).join(", ")})`;
-    } else if (v instanceof List) {
-      printed = this.#list(v);
-    } else if (v instanceof CustomType) {
-      printed = this.#customType(v);
-    } else if (this.#isDict(v)) {
-      printed = this.#dict(v);
-    } else if (v instanceof Set) {
-      return `//js(Set(${[...v].map((v2) => this.inspect(v2)).join(", ")}))`;
-    } else {
-      printed = this.#object(v);
-    }
-    this.#references.delete(v);
-    return printed;
-  }
-  #object(v) {
-    const name = globalThis.Object.getPrototypeOf(v)?.constructor?.name || "Object";
-    const props = [];
-    for (const k of globalThis.Object.keys(v)) {
-      props.push(`${this.inspect(k)}: ${this.inspect(v[k])}`);
-    }
-    const body = props.length ? " " + props.join(", ") + " " : "";
-    const head = name === "Object" ? "" : name + " ";
-    return `//js(${head}{${body}})`;
-  }
-  #dict(map6) {
-    let body = "dict.from_list([";
-    let first2 = true;
-    let key_value_pairs = [];
-    map6.forEach((value, key) => {
-      key_value_pairs.push([key, value]);
-    });
-    key_value_pairs.sort();
-    key_value_pairs.forEach(([key, value]) => {
-      if (!first2)
-        body = body + ", ";
-      body = body + "#(" + this.inspect(key) + ", " + this.inspect(value) + ")";
-      first2 = false;
-    });
-    return body + "])";
-  }
-  #customType(record) {
-    const props = globalThis.Object.keys(record).map((label) => {
-      const value = this.inspect(record[label]);
-      return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
-    }).join(", ");
-    return props ? `${record.constructor.name}(${props})` : record.constructor.name;
-  }
-  #list(list4) {
-    if (list4 instanceof Empty) {
-      return "[]";
-    }
-    let char_out = 'charlist.from_string("';
-    let list_out = "[";
-    let current = list4;
-    while (current instanceof NonEmpty) {
-      let element4 = current.head;
-      current = current.tail;
-      if (list_out !== "[") {
-        list_out += ", ";
-      }
-      list_out += this.inspect(element4);
-      if (char_out) {
-        if (globalThis.Number.isInteger(element4) && element4 >= 32 && element4 <= 126) {
-          char_out += globalThis.String.fromCharCode(element4);
-        } else {
-          char_out = null;
-        }
-      }
-    }
-    if (char_out) {
-      return char_out + '")';
-    } else {
-      return list_out + "]";
-    }
-  }
-  #string(str) {
-    let new_str = '"';
-    for (let i = 0;i < str.length; i++) {
-      const char = str[i];
-      switch (char) {
-        case `
-`:
-          new_str += "\\n";
-          break;
-        case "\r":
-          new_str += "\\r";
-          break;
-        case "\t":
-          new_str += "\\t";
-          break;
-        case "\f":
-          new_str += "\\f";
-          break;
-        case "\\":
-          new_str += "\\\\";
-          break;
-        case '"':
-          new_str += "\\\"";
-          break;
-        default:
-          if (char < " " || char > "~" && char < " ") {
-            new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
-          } else {
-            new_str += char;
-          }
-      }
-    }
-    new_str += '"';
-    return new_str;
-  }
-  #utfCodepoint(codepoint2) {
-    return `//utfcodepoint(${globalThis.String.fromCodePoint(codepoint2.value)})`;
-  }
-  #bit_array(bits) {
-    if (bits.bitSize === 0) {
-      return "<<>>";
-    }
-    let acc = "<<";
-    for (let i = 0;i < bits.byteSize - 1; i++) {
-      acc += bits.byteAt(i).toString();
-      acc += ", ";
-    }
-    if (bits.byteSize * 8 === bits.bitSize) {
-      acc += bits.byteAt(bits.byteSize - 1).toString();
-    } else {
-      const trailingBitsCount = bits.bitSize % 8;
-      acc += bits.byteAt(bits.byteSize - 1) >> 8 - trailingBitsCount;
-      acc += `:size(${trailingBitsCount})`;
-    }
-    acc += ">>";
-    return acc;
-  }
 }
 
 // .lustre/build/frontend.mjs
